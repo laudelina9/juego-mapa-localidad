@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Separar en Origen</title>
+  <style>
+    :root{
+      --bg:#0f172a;--card:#111827;--muted:#cbd5e1;--text:#f8fafc;
+      --ok:#22c55e;--bad:#ef4444
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:linear-gradient(180deg,#0b1020,#111827);color:var(--text)
+    }
+    .wrap{max-width:1100px;margin:0 auto;padding:14px}
+    .top,.panel,.game,.footer{
+      background:rgba(17,24,39,.92);border:1px solid rgba(148,163,184,.18);
+      border-radius:16px;box-shadow:0 12px 30px rgba(0,0,0,.18)
+    }
+    .top{padding:14px 16px;margin-bottom:12px}
+    h1{font-size:clamp(20px,4vw,34px);margin:0 0 6px}
+    p{margin:6px 0;color:var(--muted);line-height:1.4}
+    .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    button{
+      border:0;border-radius:12px;padding:11px 14px;background:#2563eb;color:#fff;font-weight:700;
+      font:inherit
+    }
+    button.secondary{background:#334155}
+    button.good{background:#16a34a}
+    .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:8px}
+    .stat{
+      background:#0b1220;border:1px solid rgba(148,163,184,.16);border-radius:12px;
+      padding:10px;text-align:center
+    }
+    .stat b{display:block;font-size:22px}
+    .game{position:relative;overflow:hidden;min-height:72vh}
+    #mapArea{
+      position:relative;min-height:72vh;
+      background:#09111f url('mapa-localidad.jpg') center/cover no-repeat
+    }
+    #mapHint{
+      position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+      pointer-events:none;color:#e2e8f0;font-size:clamp(18px,3vw,26px);
+      padding:20px;text-align:center;text-shadow:0 2px 10px rgba(0,0,0,.7);z-index:1
+    }
+    .dropzone{
+      position:absolute;min-width:22%;min-height:13%;border:3px dashed rgba(255,255,255,.55);
+      border-radius:16px;background:rgba(2,6,23,.35);backdrop-filter:blur(2px);
+      padding:8px;display:flex;flex-direction:column;justify-content:flex-start;gap:4px;z-index:2
+    }
+    .dropzone h3{margin:0;font-size:clamp(14px,2.6vw,20px)}
+    .dropzone small{color:#e5e7eb}
+    .ok{border-color:var(--ok);box-shadow:0 0 0 2px rgba(34,197,94,.25) inset}
+    .bad{border-color:var(--bad);box-shadow:0 0 0 2px rgba(239,68,68,.25) inset}
+    .trash{
+      position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+      width:clamp(84px,16vw,120px);height:clamp(84px,16vw,120px);border-radius:22px;
+      display:none;align-items:center;justify-content:center;background:rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.12);font-size:clamp(34px,7vw,58px);
+      user-select:none;touch-action:none;z-index:3
+    }
+    .trash.visible{display:flex}
+    .trash.dragging{opacity:.92;transform:translate(-50%,-50%) scale(1.05)}
+    .trash.correct{outline:4px solid rgba(34,197,94,.8)}
+    .trash.wrong{outline:4px solid rgba(239,68,68,.8)}
+    .questions{display:grid;gap:10px;margin-top:10px}
+    .q{
+      background:#0b1220;border:1px solid rgba(148,163,184,.16);border-radius:14px;padding:10px
+    }
+    .q h4{margin:0 0 6px;font-size:16px}
+    .choices{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .choice{
+      background:#1f2937;color:#fff;border:1px solid rgba(148,163,184,.18);
+      padding:10px;border-radius:12px;text-align:left
+    }
+    .choice.correct{background:#14532d;border-color:#22c55e}
+    .choice.wrong{background:#7f1d1d;border-color:#ef4444}
+    .footer{padding:12px;margin-top:12px;color:var(--muted)}
+    .startOverlay{
+      position:absolute;inset:0;background:rgba(2,6,23,.58);display:flex;
+      align-items:center;justify-content:center;z-index:4
+    }
+    .startOverlay.hidden{display:none}
+    .startBox{
+      background:rgba(15,23,42,.92);border:1px solid rgba(148,163,184,.18);
+      border-radius:18px;padding:18px;max-width:min(92vw,520px);text-align:center;
+      box-shadow:0 12px 30px rgba(0,0,0,.25)
+    }
+    .startBox h2{margin:0 0 8px;font-size:clamp(18px,4vw,28px)}
+    .startBox p{margin:0 0 14px}
+    .endOverlay{
+      position:fixed;inset:0;background:rgba(2,6,23,.86);display:none;
+      align-items:center;justify-content:center;z-index:999;padding:16px
+    }
+    .endOverlay.show{display:flex}
+    .endBox{
+      width:min(92vw,760px);background:linear-gradient(180deg,#1d4ed8,#0f172a);
+      border:2px solid rgba(255,255,255,.18);border-radius:24px;padding:28px 20px;
+      text-align:center;box-shadow:0 18px 50px rgba(0,0,0,.45)
+    }
+    .endBox h2{
+      margin:0 0 14px;font-size:clamp(30px,6vw,60px);line-height:1.05;color:#fff;
+      text-shadow:0 4px 18px rgba(0,0,0,.35)
+    }
+    .endBox p{
+      margin:0 0 18px;font-size:clamp(18px,3.6vw,28px);line-height:1.35;color:#fef3c7;
+      font-weight:800
+    }
+    .endActions{
+      display:flex;flex-wrap:wrap;gap:10px;justify-content:center
+    }
+    .endActions button{
+      font-size:18px;padding:14px 18px;min-width:180px
+    }
+    @media (max-width:760px){
+      .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .choices{grid-template-columns:1fr}
+      .dropzone{min-width:40%;min-height:12%}
+      .endActions button{min-width:100%}
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <section class="top">
+    <h1>Separar en Origen</h1>
+    <p>Juego educativo para reciclar. En las esquinas del mapa hay 4 contenedores con sus etiquetas de reciclado; al tocar iniciar aparecerán los residuos de a uno, que tendrás que ubicar en el contenedor que corresponda.</p>
+    <div class="row">
+      <button id="startBtn" class="good">Iniciar juego</button>
+      <button id="resetBtn" class="secondary">Reiniciar</button>
+      <button id="showAnswerBtn" class="secondary">Ver respuesta del reto</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="score">0</b><span>Puntos</span></div>
+      <div class="stat"><b id="round">1</b><span>Reto</span></div>
+      <div class="stat"><b id="hits">0</b><span>Aciertos</span></div>
+      <div class="stat"><b id="mistakes">0</b><span>Errores</span></div>
+    </div>
+  </section>
+
+  <section class="game panel">
+    <div id="mapArea">
+      <div id="mapHint">Mapa de la localidad cargado por defecto</div>
+
+      <div class="dropzone" data-type="org" style="left:2%;top:4%">
+        <h3>Orgánicos</h3>
+        <small>Restos de comida y poda</small>
+      </div>
+      <div class="dropzone" data-type="rec" style="right:2%;top:4%">
+        <h3>Reciclables</h3>
+        <small>Papel, cartón, plástico limpio</small>
+      </div>
+      <div class="dropzone" data-type="san" style="left:2%;bottom:4%">
+        <h3>Sanitarios</h3>
+        <small>Paños, toallitas, barbijos</small>
+      </div>
+      <div class="dropzone" data-type="pel" style="right:2%;bottom:4%">
+        <h3>Peligrosos</h3>
+        <small>Pilas, aceite, medicamentos</small>
+      </div>
+
+      <div id="startOverlay" class="startOverlay">
+        <div class="startBox">
+          <h2>Listo para comenzar</h2>
+          <p>Cuando toques “Iniciar juego”, aparecerá un residuo. Ubicalo en el contenedor correcto y luego aparecerá el siguiente.</p>
+          <button id="startOverlayBtn" class="good" style="font-size:20px;padding:16px 22px">Iniciar juego</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 id="challengeTitle" style="margin:0 0 6px">Desafío 1</h2>
+    <p id="challengeText"></p>
+    <div id="questionArea" class="questions"></div>
+  </section>
+
+  <section class="footer">
+    <strong>Meta:</strong> completar 10 desafíos. Cada acierto suma 10 puntos. Los residuos no se repiten seguidos: van alternándose. ¡SUERTE!.
+  </section>
+</div>
+
+<div id="endOverlay" class="endOverlay">
+  <div class="endBox">
+    <h2>¡SEPARAR EL ORIGEN CUIDA LA SALUD, EL BARRIO Y EL MEDIO AMBIENTE!</h2>
+    <p>CADA RESIDUO EN SU LUGAR ES MENOS CONTAMINACIÓN, MÁS RECICLAJE Y UNA COMUNIDAD MÁS LIMPIA.</p>
+    <div class="endActions">
+      <button id="playAgainBtn" class="good">Volver a jugar</button>
+      <button id="exitBtn" class="secondary">Salir del juego</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CHALLENGES = [
+  { t:'Separación correcta', q:'¿Qué pasa cuando mezclamos residuos orgánicos con reciclables?', c:['Facilita el reciclado','Dificulta la recuperación y ensucia materiales','Reduce los residuos de forma mágica'], a:1 },
+  { t:'Salud comunitaria', q:'¿Qué problema de salud puede aumentar cerca de basurales a cielo abierto?', c:['Respiratorio e infecciones','Mejora la calidad del aire','Fortalece el agua potable'], a:0 },
+  { t:'Orgánicos', q:'¿Cuál va al contenedor orgánico?', c:['Cáscaras de frutas','Botella de vidrio limpia','Pila usada'], a:0 },
+  { t:'Reciclables', q:'¿Qué residuo suele ser reciclable si está limpio y seco?', c:['Papel y cartón','Restos de comida','Pañales'], a:0 },
+  { t:'Peligrosos', q:'¿Dónde colocás pilas y medicamentos vencidos?', c:['En reciclables','En peligrosos','En orgánicos'], a:1 },
+  { t:'Impacto ambiental', q:'¿Qué genera la mala disposición de residuos en agua y suelo?', c:['Menos contaminación','Lixiviados y contaminación','Solo olor agradable'], a:1 },
+  { t:'Consumo responsable', q:'¿Qué acción ayuda más a reducir residuos?', c:['Comprar sólo lo necesario','Tirar todo junto','Usar más descartables'], a:0 },
+  { t:'Hábitos', q:'¿Cuál es una buena práctica en la casa o escuela?', c:['Separar en origen','Enterrar basura en el patio','Quemar residuos'], a:0 },
+  { t:'Comunidad', q:'¿Por qué conviene separar residuos en la localidad?', c:['Mejora limpieza, salud y reciclaje','Aumenta la basura','Hace innecesaria la recolección'], a:0 },
+  { t:'Cierre', q:'¿Qué transmite este juego?', c:['La basura no tiene consecuencias','La separación en origen cuida ambiente y salud','Sólo importa el color del tacho'], a:1 }
+];
+
+const trashItems = [
+  { e:'🍎', type:'org', x:32, y:38 },
+  { e:'📄', type:'rec', x:28, y:62 },
+  { e:'🧴', type:'rec', x:62, y:32 },
+  { e:'🩹', type:'san', x:66, y:63 },
+  { e:'🔋', type:'pel', x:46, y:48 },
+  { e:'🥕', type:'org', x:10, y:56 }
+];
+
+let bag = [...trashItems];
+function nextTrash() {
+  if (!bag.length) bag = [...trashItems].sort(() => Math.random() - 0.5);
+  return bag.shift();
+}
+
+const mapArea = document.getElementById('mapArea');
+const mapHint = document.getElementById('mapHint');
+const startOverlay = document.getElementById('startOverlay');
+const endOverlay = document.getElementById('endOverlay');
+const startBtn = document.getElementById('startBtn');
+const startOverlayBtn = document.getElementById('startOverlayBtn');
+const resetBtn = document.getElementById('resetBtn');
+const showAnswerBtn = document.getElementById('showAnswerBtn');
+const playAgainBtn = document.getElementById('playAgainBtn');
+const exitBtn = document.getElementById('exitBtn');
+const scoreEl = document.getElementById('score');
+const roundEl = document.getElementById('round');
+const hitsEl = document.getElementById('hits');
+const mistakesEl = document.getElementById('mistakes');
+const titleEl = document.getElementById('challengeTitle');
+const textEl = document.getElementById('challengeText');
+const qArea = document.getElementById('questionArea');
+
+let score = 0, hits = 0, mistakes = 0, current = 0;
+let dragging = null, offsetX = 0, offsetY = 0;
+let started = false;
+let gameEnded = false;
+
+let audioCtx = null;
+function unlockAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function tone(freq, duration, type, gainValue) {
+  unlockAudio();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.value = gainValue;
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  gain.gain.setValueAtTime(gainValue, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+  osc.stop(audioCtx.currentTime + duration + 0.02);
+}
+
+function playOk() {
+  tone(660, 0.12, 'sine', 0.12);
+  setTimeout(() => tone(880, 0.13, 'sine', 0.10), 120);
+}
+
+function playBad() {
+  tone(180, 0.18, 'square', 0.10);
+  setTimeout(() => tone(130, 0.20, 'square', 0.08), 150);
+}
+
+function renderQuestion() {
+  const ch = CHALLENGES[current];
+  titleEl.textContent = 'Desafío ' + (current + 1);
+  textEl.textContent = ch.t;
+  roundEl.textContent = current + 1;
+  qArea.innerHTML = '';
+  qArea.insertAdjacentHTML(
+    'beforeend',
+    `<div class="q">
+      <h4>${ch.q}</h4>
+      <div class="choices">
+        ${ch.c.map((x,i)=>`<button class="choice" data-i="${i}">${x}</button>`).join('')}
+      </div>
+    </div>`
+  );
+  qArea.querySelectorAll('.choice').forEach(b => b.onclick = () => answer(Number(b.dataset.i), b));
+}
+
+function answer(i, btn) {
+  const ok = i === CHALLENGES[current].a;
+  btn.classList.add(ok ? 'correct' : 'wrong');
+  qArea.querySelectorAll('button').forEach(b => b.disabled = true);
+
+  if (ok) {
+    score += 10;
+    hits++;
+    playOk();
+  } else {
+    mistakes++;
+    playBad();
+  }
+
+  update();
+
+  setTimeout(() => {
+    current++;
+    if (current >= CHALLENGES.length) {
+      showEndMessage();
+      return;
+    }
+    renderQuestion();
+  }, 700);
+}
+
+function update() {
+  scoreEl.textContent = score;
+  hitsEl.textContent = hits;
+  mistakesEl.textContent = mistakes;
+}
+
+function placeTrash() {
+  const t = nextTrash();
+  const d = document.createElement('div');
+  d.className = 'trash visible';
+  d.textContent = t.e;
+  d.dataset.type = t.type;
+  d.style.left = t.x + '%';
+  d.style.top = t.y + '%';
+  mapArea.appendChild(d);
+
+  d.addEventListener('pointerdown', e => {
+    dragging = d;
+    const r = d.getBoundingClientRect();
+    offsetX = e.clientX - r.left;
+    offsetY = e.clientY - r.top;
+    d.setPointerCapture(e.pointerId);
+    d.classList.add('dragging');
+  });
+
+  d.addEventListener('pointermove', e => {
+    if (!dragging || dragging !== d) return;
+    const r = mapArea.getBoundingClientRect();
+    const x = e.clientX - r.left - offsetX;
+    const y = e.clientY - r.top - offsetY;
+    d.style.left = Math.max(0, Math.min(x, r.width - 60)) + 'px';
+    d.style.top = Math.max(0, Math.min(y, r.height - 60)) + 'px';
+  });
+
+  d.addEventListener('pointerup', () => checkDrop(d));
+}
+
+function checkDrop(d) {
+  dragging = null;
+  d.classList.remove('dragging');
+
+  const dz = [...document.querySelectorAll('.dropzone')].find(z => intersects(d, z));
+  if (!dz) {
+    d.classList.add('wrong');
+    mistakes++;
+    playBad();
+    update();
+    return;
+  }
+
+  const ok = dz.dataset.type === d.dataset.type;
+  dz.classList.toggle('ok', ok);
+  dz.classList.toggle('bad', !ok);
+  d.classList.add(ok ? 'correct' : 'wrong');
+
+  if (ok) {
+    score += 10;
+    hits++;
+    playOk();
+    d.remove();
+    setTimeout(placeTrash, 450);
+  } else {
+    mistakes++;
+    playBad();
+  }
+
+  update();
+
+  setTimeout(() => {
+    dz.classList.remove('ok', 'bad');
+    if (d.parentNode) d.classList.remove('correct', 'wrong');
+  }, 700);
+}
+
+function intersects(a, b) {
+  const ra = a.getBoundingClientRect();
+  const rb = b.getBoundingClientRect();
+  return !(ra.right < rb.left || ra.left > rb.right || ra.bottom < rb.top || ra.top > rb.bottom);
+}
+
+function showEndMessage() {
+  if (gameEnded) return;
+  gameEnded = true;
+  endOverlay.classList.add('show');
+  playOk();
+}
+
+function startGame() {
+  if (started) return;
+  started = true;
+  unlockAudio();
+  startOverlay.classList.add('hidden');
+  mapHint.style.display = 'none';
+  renderQuestion();
+  placeTrash();
+}
+
+function restartGame() {
+  location.reload();
+}
+
+function exitGame() {
+  endOverlay.classList.remove('show');
+  gameEnded = false;
+  current = 0;
+  score = 0;
+  hits = 0;
+  mistakes = 0;
+  started = false;
+  bag = [...trashItems];
+  mapArea.querySelectorAll('.trash').forEach(el => el.remove());
+  update();
+  renderQuestion();
+  mapHint.style.display = 'flex';
+  startOverlay.classList.remove('hidden');
+}
+
+startBtn.onclick = startGame;
+startOverlayBtn.onclick = startGame;
+resetBtn.onclick = restartGame;
+showAnswerBtn.onclick = () => {
+  playOk();
+  alert('Respuesta correcta del desafío actual: ' + CHALLENGES[current].c[CHALLENGES[current].a]);
+};
+playAgainBtn.onclick = restartGame;
+exitBtn.onclick = exitGame;
+
+renderQuestion();
+update();
+</script>
+</body>
+</html>
