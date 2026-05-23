@@ -12,9 +12,27 @@
     *{box-sizing:border-box}
     body{
       margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      background:linear-gradient(180deg,#0b1020,#111827);color:var(--text)
+      background:linear-gradient(180deg,#0b1020,#111827);color:var(--text);
+      position:relative;
+      width:100%;
+      min-height:100vh;
     }
-    .wrap{max-width:1100px;margin:0 auto;padding:14px}
+    
+    /* CAPA MÁGICA PARA EL MAPA TRANSPARENTE DE FONDO */
+    body::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #09111f url('mapa-localidad.jpg') center/cover no-repeat;
+      opacity: 0.4; /* Cambiá este número si querés más o menos transparencia (0.1 al 1.0) */
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .wrap{position:relative;max-width:1100px;margin:0 auto;padding:14px;z-index:1}
     .top,.panel,.game,.footer{
       background:rgba(17,24,39,.92);border:1px solid rgba(148,163,184,.18);
       border-radius:16px;box-shadow:0 12px 30px rgba(0,0,0,.18)
@@ -36,9 +54,10 @@
     }
     .stat b{display:block;font-size:22px}
     .game{position:relative;overflow:hidden;min-height:72vh}
+    
+    /* Le quitamos el fondo pesado de acá para que use el transparente del body */
     #mapArea{
       position:relative;min-height:72vh;
-      background:#09111f url('./mapa-localidad.jpg') center/cover no-repeat
     }
     #mapHint{
       position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
@@ -126,7 +145,9 @@
 <div class="wrap">
   <section class="top">
     <h1>Separar en Origen</h1>
-    <p>Juego educativo para reciclar. En las esquinas del mapa hay 4 contenedores con sus etiquetas de reciclado; al tocar iniciar aparecerán los residuos de a uno, que tendrás que ubicar en el contenedor que corresponda.</p>
+    <p>Juego educativo para reciclar.
+    En las esquinas del mapa hay 4 contenedores con sus etiquetas de reciclado;
+    al tocar iniciar aparecerán los residuos de a uno, que tendrás que ubicar en el contenedor que corresponda.</p>
     <div class="row">
       <button id="startBtn" class="good">Iniciar juego</button>
       <button id="resetBtn" class="secondary">Reiniciar</button>
@@ -164,7 +185,8 @@
       <div id="startOverlay" class="startOverlay">
         <div class="startBox">
           <h2>Listo para comenzar</h2>
-          <p>Cuando toques “Iniciar juego”, aparecerá un residuo. Ubicalo en el contenedor correcto y luego aparecerá el siguiente.</p>
+          <p>Cuando toques “Iniciar juego”, aparecerá un residuo.
+          Ubicalo en el contenedor correcto y luego aparecerá el siguiente.</p>
           <button id="startOverlayBtn" class="good" style="font-size:20px;padding:16px 22px">Iniciar juego</button>
         </div>
       </div>
@@ -178,7 +200,8 @@
   </section>
 
   <section class="footer">
-    <strong>Meta:</strong> completar 10 desafíos. Cada acierto suma 10 puntos. Los residuos no se repiten seguidos: van alternándose. ¡SUERTE!.
+    <strong>Meta:</strong> completar 10 desafíos.
+    Cada acierto suma 10 puntos. Los residuos no se repiten seguidos: van alternándose. ¡SUERTE!.
   </section>
 </div>
 
@@ -207,13 +230,18 @@ const CHALLENGES = [
   { t:'Cierre', q:'¿Qué transmite este juego?', c:['La basura no tiene consecuencias','La separación en origen cuida ambiente y salud','Sólo importa el color del tacho'], a:1 }
 ];
 
+// LISTA DE RESIDUOS ACTUALIZADA CON TUS NUEVOS ICONOS
 const trashItems = [
   { e:'🍎', type:'org', x:32, y:38 },
   { e:'📄', type:'rec', x:28, y:62 },
-  { e:'🧴', type:'rec', x:62, y:32 },
-  { e:'🩹', type:'san', x:66, y:63 },
+  { e:'🧪', type:'rec', x:62, y:32 }, // Botella de vidrio
+  { e:'🧷️', type:'san', x:66, y:63 }, // Pañal o elemento sanitario alternativo
   { e:'🔋', type:'pel', x:46, y:48 },
-  { e:'🥕', type:'org', x:10, y:56 }
+  { e:'🥕', type:'org', x:10, y:56 },
+  { e:'💉', type:'pel', x:50, y:25 }, // Aguja / Riesgo punzante
+  { e:'📟', type:'pel', x:75, y:45 }, // Componente electrónico de compu
+  { e:'🩹', type:'san', x:20, y:75 }, // Venda usada
+  { e:'🥚', type:'rec', x:40, y:70 }  // Maple de huevos vacío
 ];
 
 let bag = [...trashItems];
@@ -244,7 +272,6 @@ let score = 0, hits = 0, mistakes = 0, current = 0;
 let dragging = null, offsetX = 0, offsetY = 0;
 let started = false;
 let gameEnded = false;
-
 let audioCtx = null;
 function unlockAudio() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -263,192 +290,3 @@ function tone(freq, duration, type, gainValue) {
   osc.start();
   gain.gain.setValueAtTime(gainValue, audioCtx.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
-  osc.stop(audioCtx.currentTime + duration + 0.02);
-}
-
-function playOk() {
-  tone(660, 0.12, 'sine', 0.12);
-  setTimeout(() => tone(880, 0.13, 'sine', 0.10), 120);
-}
-
-function playBad() {
-  tone(180, 0.18, 'square', 0.10);
-  setTimeout(() => tone(130, 0.20, 'square', 0.08), 150);
-}
-
-function renderQuestion() {
-  const ch = CHALLENGES[current];
-  titleEl.textContent = 'Desafío ' + (current + 1);
-  textEl.textContent = ch.t;
-  roundEl.textContent = current + 1;
-  qArea.innerHTML = '';
-  qArea.insertAdjacentHTML(
-    'beforeend',
-    `<div class="q">
-      <h4>${ch.q}</h4>
-      <div class="choices">
-        ${ch.c.map((x,i)=>`<button class="choice" data-i="${i}">${x}</button>`).join('')}
-      </div>
-    </div>`
-  );
-  qArea.querySelectorAll('.choice').forEach(b => b.onclick = () => answer(Number(b.dataset.i), b));
-}
-
-function answer(i, btn) {
-  const ok = i === CHALLENGES[current].a;
-  btn.classList.add(ok ? 'correct' : 'wrong');
-  qArea.querySelectorAll('button').forEach(b => b.disabled = true);
-
-  if (ok) {
-    score += 10;
-    hits++;
-    playOk();
-  } else {
-    mistakes++;
-    playBad();
-  }
-
-  update();
-
-  setTimeout(() => {
-    current++;
-    if (current >= CHALLENGES.length) {
-      showEndMessage();
-      return;
-    }
-    renderQuestion();
-  }, 700);
-}
-
-function update() {
-  scoreEl.textContent = score;
-  hitsEl.textContent = hits;
-  mistakesEl.textContent = mistakes;
-}
-
-function placeTrash() {
-  const t = nextTrash();
-  const d = document.createElement('div');
-  d.className = 'trash visible';
-  d.textContent = t.e;
-  d.dataset.type = t.type;
-  d.style.left = t.x + '%';
-  d.style.top = t.y + '%';
-  mapArea.appendChild(d);
-
-  d.addEventListener('pointerdown', e => {
-    dragging = d;
-    const r = d.getBoundingClientRect();
-    offsetX = e.clientX - r.left;
-    offsetY = e.clientY - r.top;
-    d.setPointerCapture(e.pointerId);
-    d.classList.add('dragging');
-  });
-
-  d.addEventListener('pointermove', e => {
-    if (!dragging || dragging !== d) return;
-    const r = mapArea.getBoundingClientRect();
-    const x = e.clientX - r.left - offsetX;
-    const y = e.clientY - r.top - offsetY;
-    d.style.left = Math.max(0, Math.min(x, r.width - 60)) + 'px';
-    d.style.top = Math.max(0, Math.min(y, r.height - 60)) + 'px';
-  });
-
-  d.addEventListener('pointerup', () => checkDrop(d));
-}
-
-function checkDrop(d) {
-  dragging = null;
-  d.classList.remove('dragging');
-
-  const dz = [...document.querySelectorAll('.dropzone')].find(z => intersects(d, z));
-  if (!dz) {
-    d.classList.add('wrong');
-    mistakes++;
-    playBad();
-    update();
-    return;
-  }
-
-  const ok = dz.dataset.type === d.dataset.type;
-  dz.classList.toggle('ok', ok);
-  dz.classList.toggle('bad', !ok);
-  d.classList.add(ok ? 'correct' : 'wrong');
-
-  if (ok) {
-    score += 10;
-    hits++;
-    playOk();
-    d.remove();
-    setTimeout(placeTrash, 450);
-  } else {
-    mistakes++;
-    playBad();
-  }
-
-  update();
-
-  setTimeout(() => {
-    dz.classList.remove('ok', 'bad');
-    if (d.parentNode) d.classList.remove('correct', 'wrong');
-  }, 700);
-}
-
-function intersects(a, b) {
-  const ra = a.getBoundingClientRect();
-  const rb = b.getBoundingClientRect();
-  return !(ra.right < rb.left || ra.left > rb.right || ra.bottom < rb.top || ra.top > rb.bottom);
-}
-
-function showEndMessage() {
-  if (gameEnded) return;
-  gameEnded = true;
-  endOverlay.classList.add('show');
-  playOk();
-}
-
-function startGame() {
-  if (started) return;
-  started = true;
-  unlockAudio();
-  startOverlay.classList.add('hidden');
-  mapHint.style.display = 'none';
-  renderQuestion();
-  placeTrash();
-}
-
-function restartGame() {
-  location.reload();
-}
-
-function exitGame() {
-  endOverlay.classList.remove('show');
-  gameEnded = false;
-  current = 0;
-  score = 0;
-  hits = 0;
-  mistakes = 0;
-  started = false;
-  bag = [...trashItems];
-  mapArea.querySelectorAll('.trash').forEach(el => el.remove());
-  update();
-  renderQuestion();
-  mapHint.style.display = 'flex';
-  startOverlay.classList.remove('hidden');
-}
-
-startBtn.onclick = startGame;
-startOverlayBtn.onclick = startGame;
-resetBtn.onclick = restartGame;
-showAnswerBtn.onclick = () => {
-  playOk();
-  alert('Respuesta correcta del desafío actual: ' + CHALLENGES[current].c[CHALLENGES[current].a]);
-};
-playAgainBtn.onclick = restartGame;
-exitBtn.onclick = exitGame;
-
-renderQuestion();
-update();
-</script>
-</body>
-</html>
